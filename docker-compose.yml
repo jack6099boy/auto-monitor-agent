@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  autotest-aiops-agent:
+    build: .
+    container_name: autotest-aiops-agent
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./chroma_db:/app/chroma_db
+      - ./sop:/app/sop
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_CHANNEL=${SLACK_CHANNEL}
+      - EMAIL_SERVER=${EMAIL_SERVER}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_TO=${EMAIL_TO}
+    restart: unless-stopped
+    command: python -m agent.monitor  # Run monitor by default, or change to agent.agent for full agent
