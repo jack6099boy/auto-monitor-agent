@@ -11,9 +11,48 @@
 - 📚 **RAG 知識系統**: Docling 提取 SOP 文件，Chroma 向量儲存，LlamaIndex 智慧查詢
 - 🤖 **Agent 推理**: LangGraph 建構混合模式 Agent，整合工具調用和 LLM 推理
 - 📢 **通知系統**: Slack 和 Email 即時警報
-- 🚀 **DevOps 就緒**: Docker 容器化，CI/CD 管道，性能監控
+- 🏭 **多實驗室支援**: 單一 API Server 支援多個實驗室，資料隔離
+- 🚀 **DevOps 就緒**: Docker 容器化，CI/CD 管道，FastAPI REST API
 
 ## 系統架構
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         多實驗室 AIOps Agent 架構                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                              ┌─────────────────────┐
+                              │   API Server :8000  │
+                              │   (FastAPI)         │
+                              └──────────┬──────────┘
+                                         │
+        ┌────────────────────────────────┼────────────────────────────────┐
+        │                                │                                │
+        ▼                                ▼                                ▼
+  ┌───────────┐                    ┌───────────┐                    ┌───────────┐
+  │   lab1    │                    │   lab2    │                    │   lab3    │  ...
+  │           │                    │           │                    │           │
+  │ • RAG     │                    │ • RAG     │                    │ • RAG     │
+  │ • Agent   │                    │ • Agent   │                    │ • Agent   │
+  │ • Monitor │                    │ • Monitor │                    │ • Monitor │
+  └─────┬─────┘                    └─────┬─────┘                    └─────┬─────┘
+        │                                │                                │
+        ▼                                ▼                                ▼
+  ┌───────────┐                    ┌───────────┐                    ┌───────────┐
+  │sop/lab1/  │                    │sop/lab2/  │                    │sop/lab3/  │
+  │ *.pdf     │                    │ *.pdf     │                    │ *.pdf     │
+  └───────────┘                    └───────────┘                    └───────────┘
+        │                                │                                │
+        └────────────────────────────────┼────────────────────────────────┘
+                                         ▼
+                              ┌─────────────────────┐
+                              │      ChromaDB       │
+                              │  (共享向量庫)        │
+                              │  Collection 隔離    │
+                              └─────────────────────┘
+```
+
+### 資料流程
 
 ```mermaid
 graph TD
@@ -26,60 +65,40 @@ graph TD
     F --> G[Tool Selection]
     G --> H[Query SOP Tool]
     G --> I[Check Logs Tool]
+    G --> J[Analyze Log with Drain]
 
-    H --> J[RAG System]
-    J --> K[Docling Extract SOP]
-    K --> L[Chroma Vector DB]
-    L --> M[LlamaIndex Query Engine]
-    M --> N[bge-large-zh-v1.5 Embedding]
-    N --> O[GPT-4o-mini Response]
+    H --> K[RAG System]
+    K --> L[Docling Extract SOP]
+    L --> M[Chroma Vector DB]
+    M --> N[LlamaIndex Query Engine]
+    N --> O[bge-large-zh-v1.5 Embedding]
+    O --> P[GPT-4o-mini Response]
 
-    I --> P[Log Analysis]
-    P --> O
+    I --> Q[Log Analysis]
+    Q --> P
 
-    O --> F
-    F --> Q[Final Response]
-    Q --> R[Notification Slack Email]
+    P --> F
+    F --> R[Final Response]
+    R --> S[Notification Slack Email]
+    R --> T[HintManager C# Integration]
 
-    S[SOP Files PDF PPT MD] --> K
+    U[SOP Files PDF PPT MD] --> L
 ```
-
-### 架構說明
-
-#### 1. 資料輸入層
-- **Log Files**: 測試系統產生的應用日誌
-- **SOP Files**: 標準操作程序文件（PDF、PPT、Markdown格式）
-
-#### 2. 監控層
-- **Log Monitor**: 使用 Drain3 進行日誌模板挖掘和異常檢測，Watchdog 監控檔案變化
-- **Notification System**: 當檢測到異常時，立即發送 Slack 和 Email 通知
-
-#### 3. 處理層
-- **Agent (LangGraph)**: 混合模式 Agent，負責協調工具調用和推理流程
-  - **Tool Selection**: 根據異常情況選擇適當工具
-  - **Query SOP Tool**: 查詢相關 SOP 文件
-  - **Check Logs Tool**: 分析日誌模式
-
-#### 4. 知識層
-- **RAG System**: 檢索增強生成系統
-  - **Docling**: 提取 SOP 文件內容
-  - **Chroma**: 向量資料庫儲存嵌入
-  - **LlamaIndex**: 建構查詢引擎
-  - **bge-large-zh-v1.5**: 中文嵌入模型
-  - **GPT-4o-mini**: LLM 生成回應
-
-#### 5. 輸出層
-- **Final Response**: Agent 生成的解決建議
-- **Notification**: 最終通知發送到指定渠道
 
 ## 技術堆疊
 
-- **程式語言**: Python 3.11+
-- **框架**: LangChain/LangGraph, LlamaIndex
-- **AI 模型**: GPT-4o-mini (via OpenRouter), bge-large-zh-v1.5
-- **資料庫**: Chroma (向量), SQLite (Drain3 狀態)
-- **部署**: Docker, GitHub Actions CI/CD
-- **測試**: pytest
+| 類別 | 技術 |
+|------|------|
+| **程式語言** | Python 3.11+ |
+| **API 框架** | FastAPI, Uvicorn |
+| **Agent 框架** | LangChain, LangGraph |
+| **RAG 框架** | LlamaIndex, Docling |
+| **AI 模型** | GPT-4o-mini (OpenRouter), bge-large-zh-v1.5 |
+| **向量資料庫** | ChromaDB |
+| **Log 分析** | Drain3 |
+| **部署** | Docker, Docker Compose |
+| **CI/CD** | GitHub Actions |
+| **測試** | pytest |
 
 ## 安裝與設定
 
@@ -110,38 +129,94 @@ graph TD
    ```
 
 4. **設定環境變數**
-   編輯 `.env` 文件：
-   ```
-   OPENROUTER_API_KEY=你的 OpenRouter API key
-   SLACK_BOT_TOKEN=你的 Slack bot token (可選)
-   EMAIL_SMTP_SERVER=smtp.gmail.com (可選)
-   EMAIL_USER=你的 email (可選)
-   EMAIL_PASS=你的 email 密碼 (可選)
+
+   建立 `.env` 文件：
+   ```bash
+   # 必要
+   OPENROUTER_API_KEY=你的_OpenRouter_API_key
+
+   # 可選 - 多實驗室配置
+   LAB_ID=default
+   ALLOWED_LABS=lab1,lab2,lab3,lab4,lab5
+
+   # 可選 - 通知
+   SLACK_BOT_TOKEN=你的_Slack_bot_token
+   SLACK_CHANNEL=#alerts
+   EMAIL_SERVER=smtp.gmail.com
+   EMAIL_PORT=587
+   EMAIL_USER=你的_email
+   EMAIL_PASSWORD=你的_email_密碼
+   EMAIL_TO=接收者_email
    ```
 
 ## 使用方法
 
-### 運行演示
+### 方式一：API Server（多實驗室）
+
 ```bash
+# 1. 建立各實驗室 SOP 目錄
+mkdir -p sop/{lab1,lab2,lab3,lab4,lab5}
+
+# 2. 放入 SOP 文件
+cp your_sop.pdf sop/lab1/
+
+# 3. 啟動 API Server
+uvicorn agent.api_server:app --host 0.0.0.0 --port 8000
+
+# 4. 查詢 SOP
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "如何處理連線逾時?", "lab_id": "lab1"}'
+```
+
+### 方式二：單機模式
+
+```bash
+# 運行演示
 python demo.py
+
+# 運行測試
+pytest -v
 ```
 
-演示會：
-1. 創建假的 SOP 文件和 log
-2. 初始化 RAG 系統
-3. 啟動 log 監控
-4. 模擬異常檢測
-5. Agent 處理異常並查詢 SOP
-6. 顯示完整推理過程
+### 方式三：Docker 部署
 
-### 運行測試
 ```bash
-pytest
+# 多實驗室 API Server
+docker-compose up api-server
+
+# 單實驗室模式
+docker-compose --profile single-lab up
 ```
 
-### Docker 部署
+## API 端點
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
+| `/` | GET | API 資訊 |
+| `/health` | GET | 健康檢查 |
+| `/labs` | GET | 列出所有實驗室 |
+| `/labs/{lab_id}/status` | GET | 實驗室狀態 |
+| `/query` | POST | 查詢 SOP 文件 |
+| `/analyze` | POST | 分析日誌異常 |
+| `/chat` | POST | 與 Agent 對話 |
+| `/labs/{lab_id}/rebuild-index` | POST | 重建 RAG 索引 |
+
+### API 使用範例
+
 ```bash
-docker-compose up -d
+# 查詢 SOP
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How to handle connection timeout?", "lab_id": "lab1"}'
+
+# 分析日誌
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"log_content": "ERROR: Connection timeout at 10:00:00", "lab_id": "lab1"}'
+
+# 查看實驗室狀態
+curl http://localhost:8000/labs/lab1/status
 ```
 
 ## 專案結構
@@ -150,77 +225,103 @@ docker-compose up -d
 autotest-aiops-agent/
 ├── agent/                    # 核心代理模組
 │   ├── __init__.py
-│   ├── agent.py             # LangGraph Agent 實現
-│   ├── monitor.py           # Log 監控模組
-│   ├── rag.py               # RAG 系統
-│   ├── notification.py      # 通知系統
+│   ├── agent.py             # LangGraph Agent (多實驗室支援)
+│   ├── api_server.py        # FastAPI 多實驗室 API Server
+│   ├── config.py            # 配置管理 (Lab/Agent/Monitor)
+│   ├── hint_manager.py      # C# 測試框架整合
+│   ├── monitor.py           # Log 監控模組 (Drain3 + Watchdog)
+│   ├── rag.py               # RAG 系統 (多實驗室 Collection)
+│   ├── notification.py      # 通知系統 (Slack + Email)
 │   └── metrics.py           # 性能監控
 ├── tests/                   # 測試文件
 │   ├── test_agent.py
 │   ├── test_monitor.py
 │   ├── test_rag.py
-│   └── test_integration.py
-├── data/                    # 資料目錄
-├── docs/                    # 文件
+│   ├── test_integration.py
+│   └── test_integration_csharp.py
+├── sop/                     # SOP 文件 (按實驗室分目錄)
+│   ├── lab1/
+│   ├── lab2/
+│   └── ...
 ├── logs/                    # 日誌檔案
-├── sop/                     # SOP 文件
-├── .env                     # 環境變數
+├── hints/                   # C# 整合提示檔
+├── chroma_db/               # 向量資料庫 (自動生成)
+├── plans/                   # 架構規劃文件
+├── .env                     # 環境變數 (不納入版控)
 ├── demo.py                  # 演示腳本
 ├── Dockerfile               # Docker 配置
-├── docker-compose.yml       # Docker Compose
+├── docker-compose.yml       # Docker Compose (含 API Server)
 ├── pyproject.toml           # 專案配置
-└── README.md               # 本文件
+├── CLAUDE.md                # Claude Code 專案指引
+└── README.md                # 本文件
 ```
 
-## 開發歷程
+## 配置說明
 
-### 階段 1: 準備與設計
-- 設定專案目錄結構
-- 初始化 Python 專案和依賴
-- 設計 Agent 架構
+### LabConfig (實驗室配置)
+```python
+lab_id: str          # 實驗室 ID
+sop_dir: str         # SOP 文件目錄
+log_dir: str         # 日誌目錄
+hints_dir: str       # C# 整合目錄
+chroma_db_dir: str   # 向量庫路徑
+```
 
-### 階段 2: 核心開發
-- 實現 log 監控模組 (Drain3 + Watchdog)
-- 建構 RAG 系統 (Docling + Chroma + LlamaIndex)
-- 開發 Agent 邏輯 (LangGraph + OpenRouter)
-- LLM 調優和參數調整
+### AgentConfig (Agent 配置)
+```python
+llm_model: str = "gpt-4o-mini"
+temperature: float = 0.3
+max_tokens: int = 1000
+embedding_model: str = "BAAI/bge-large-zh-v1.5"
+```
 
-### 階段 3: 整合與測試
-- 整合所有組件
-- 撰寫單元測試和整合測試
-- 設定通知系統 (Slack + Email)
+### MonitorConfig (監控配置)
+```python
+auto_process: bool = False       # 自動觸發 Agent
+notification_cooldown: int = 300  # 通知冷卻時間 (秒)
+crash_timeout: int = 30          # 心跳超時 (秒)
+```
 
-### 階段 4: 部署與優化
-- Docker 容器化
-- GitHub Actions CI/CD 管道
-- 性能監控和優化
-- 生產環境部署準備
+## Python API
 
-## API 說明
+### 多實驗室 Agent
+```python
+from agent.agent import build_agent, get_rag_system
+
+# 取得特定實驗室的 Agent
+agent = build_agent(lab_id="lab1")
+result = agent.invoke({"messages": [{"role": "user", "content": "系統異常怎麼辦?"}]})
+
+# 取得特定實驗室的 RAG
+rag = get_rag_system(lab_id="lab2")
+response = rag.query("如何設定相機?")
+```
 
 ### Log Monitor
 ```python
 from agent.monitor import LogMonitor
 
-monitor = LogMonitor(log_file="logs/application.log")
-monitor.start_monitoring()
+monitor = LogMonitor(log_dir="logs/lab1", auto_process=True)
+monitor.start()
 ```
 
-### RAG System
-```python
-from agent.rag import RAGSystem
+## 開發歷程
 
-rag = RAGSystem()
-rag.load_documents("sop/")
-response = rag.query("資料庫連接失敗怎麼辦？")
-```
+### Phase 1: 基礎架構
+- Log 監控模組 (Drain3 + Watchdog)
+- RAG 系統 (Docling + Chroma + LlamaIndex)
+- Agent 邏輯 (LangGraph + OpenRouter)
 
-### Agent
-```python
-from agent.agent import agent
+### Phase 2: 整合與測試
+- 通知系統 (Slack + Email)
+- 單元測試和整合測試
+- Docker 容器化
 
-result = agent.invoke({"messages": [{"role": "user", "content": "系統異常"}]})
-```
+### Phase 3: 多實驗室擴展
+- 配置管理模組 (config.py)
+- Per-lab 實例快取
+- FastAPI REST API Server
+- C# 測試框架整合 (HintManager)
 
 ## 貢獻指南
 
@@ -233,9 +334,3 @@ result = agent.invoke({"messages": [{"role": "user", "content": "系統異常"}]
 ## 授權
 
 本專案採用 MIT 授權 - 詳見 [LICENSE](LICENSE) 文件
-
-## 聯絡資訊
-
-專案維護者 - [您的聯絡方式]
-
-專案連結: [GitHub Repository]
