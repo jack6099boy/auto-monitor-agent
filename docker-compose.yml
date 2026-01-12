@@ -1,16 +1,45 @@
 version: '3.8'
 
 services:
+  # ============ Central API Server ============
+  # Handles all labs, runs RAG + Agent
+  api-server:
+    build: .
+    container_name: aiops-api-server
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./sop:/app/sop:ro           # All lab SOPs (read-only)
+      - ./chroma_db:/app/chroma_db  # Shared vector store
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - ALLOWED_LABS=lab1,lab2,lab3,lab4,lab5
+    restart: unless-stopped
+    command: uvicorn agent.api_server:app --host 0.0.0.0 --port 8000
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============ Single Lab Mode (Original) ============
+  # Use this if you only need one lab
   autotest-aiops-agent:
     build: .
     container_name: autotest-aiops-agent
+    profiles: ["single-lab"]  # Only starts with: docker-compose --profile single-lab up
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
       - ./chroma_db:/app/chroma_db
       - ./sop:/app/sop
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LAB_ID=default
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
       - SLACK_CHANNEL=${SLACK_CHANNEL}
       - EMAIL_SERVER=${EMAIL_SERVER}
@@ -19,4 +48,40 @@ services:
       - EMAIL_PASSWORD=${EMAIL_PASSWORD}
       - EMAIL_TO=${EMAIL_TO}
     restart: unless-stopped
-    command: python -m agent.monitor  # Run monitor by default, or change to agent.agent for full agent
+    command: python -m agent.monitor
+
+# ============ Multi-Lab Monitor Services ============
+# Uncomment the labs you need
+
+#  monitor-lab1:
+#    build: .
+#    container_name: monitor-lab1
+#    volumes:
+#      - ./logs/lab1:/app/logs
+#      - ./hints/lab1:/app/hints
+#    environment:
+#      - LAB_ID=lab1
+#      - AGENT_API_ENDPOINT=http://api-server:8000
+#      - MONITOR_AUTO_PROCESS=true
+#    depends_on:
+#      - api-server
+#    restart: unless-stopped
+#    command: python -m agent.monitor
+
+#  monitor-lab2:
+#    build: .
+#    container_name: monitor-lab2
+#    volumes:
+#      - ./logs/lab2:/app/logs
+#      - ./hints/lab2:/app/hints
+#    environment:
+#      - LAB_ID=lab2
+#      - AGENT_API_ENDPOINT=http://api-server:8000
+#      - MONITOR_AUTO_PROCESS=true
+#    depends_on:
+#      - api-server
+#    restart: unless-stopped
+#    command: python -m agent.monitor
+
+volumes:
+  chroma_data:
